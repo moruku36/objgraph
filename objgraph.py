@@ -1237,6 +1237,11 @@ def _program_in_path(program):
     # XXX: Consider using distutils.spawn.find_executable or shutil.which
     path = os.environ.get("PATH", os.defpath).split(os.pathsep)
     path = [os.path.join(dir, program) for dir in path]
-    path = [True for file in path
-            if os.path.isfile(file) or os.path.isfile(file + '.exe')]
+    if sys.platform == 'win32':
+        # Windows has no POSIX execute permission bits.
+        path = [True for file in path
+                if os.path.isfile(file) or os.path.isfile(file + '.exe')]
+    else:
+        path = [True for file in path
+                if os.path.isfile(file) and os.access(file, os.X_OK)]
     return bool(path)

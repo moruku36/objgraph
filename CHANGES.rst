@@ -6,7 +6,10 @@ Changes
 3.7.1 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fix the lookup of ``xdot`` and ``dot`` on POSIX systems to ignore files on
+  ``PATH`` that are not executable, so that :func:`show_refs` and
+  :func:`show_backrefs` fall back to ``dot`` instead of failing to launch
+  a non-executable ``xdot``.
 
 
 3.7.0 (2026-10-16)

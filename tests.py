@@ -601,6 +601,76 @@ class PresentGraphTest(CaptureMixin, TemporaryDirectoryMixin,
                           " not found, not doing anything else\n")
 
 
+class ProgramInPathTest(CaptureMixin, TemporaryDirectoryMixin,
+                        unittest.TestCase):
+
+    def make_file(self, name, mode):
+        filename = os.path.join(self.tmpdir, name)
+        with open(filename, 'w'):
+            pass
+        os.chmod(filename, mode)
+        return filename
+
+    def set_path(self, path):
+        patcher = mock.patch.dict(os.environ, {'PATH': path})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @skipIf(sys.platform == 'win32', "POSIX execute permission")
+    def test_posix_executable_file(self):
+        self.make_file('prog', 0o755)
+        self.set_path(self.tmpdir)
+        self.assertTrue(objgraph._program_in_path('prog'))
+
+    @skipIf(sys.platform == 'win32', "POSIX execute permission")
+    def test_posix_nonexecutable_file(self):
+        self.make_file('prog', 0o644)
+        self.set_path(self.tmpdir)
+        self.assertFalse(objgraph._program_in_path('prog'))
+
+    def test_directory(self):
+        os.mkdir(os.path.join(self.tmpdir, 'prog'))
+        self.set_path(self.tmpdir)
+        self.assertFalse(objgraph._program_in_path('prog'))
+
+    def test_missing_file(self):
+        self.set_path(self.tmpdir)
+        self.assertFalse(objgraph._program_in_path('prog'))
+
+    @skipIf(sys.platform == 'win32', "POSIX execute permission")
+    def test_missing_path_uses_defpath(self):
+        self.make_file('prog', 0o755)
+        with mock.patch.dict(os.environ):
+            os.environ.pop('PATH', None)
+            with mock.patch.object(os, 'defpath', self.tmpdir):
+                self.assertTrue(objgraph._program_in_path('prog'))
+
+    def test_windows_bare_file(self):
+        self.make_file('prog', 0o644)
+        self.set_path(self.tmpdir)
+        with mock.patch.object(sys, 'platform', 'win32'):
+            self.assertTrue(objgraph._program_in_path('prog'))
+
+    def test_windows_exe_file(self):
+        self.make_file('prog.exe', 0o644)
+        self.set_path(self.tmpdir)
+        with mock.patch.object(sys, 'platform', 'win32'):
+            self.assertTrue(objgraph._program_in_path('prog'))
+
+    @skipIf(sys.platform == 'win32', "POSIX execute permission")
+    def test_present_graph_skips_nonexecutable_xdot(self):
+        self.make_file('xdot', 0o644)
+        self.make_file('dot', 0o755)
+        self.set_path(self.tmpdir)
+        with mock.patch.object(objgraph, 'subprocess', StubSubprocess()):
+            objgraph._present_graph('foo.dot')
+        self.assertOutput("""
+            Graph viewer (xdot) not found, generating a png instead
+            subprocess.Popen(['dot', '-Tpng', '-ofoo.png', 'foo.dot'])
+            Image generated as foo.png
+        """)
+
+
 # Doctests
 
 
